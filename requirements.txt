@@ -1,0 +1,15 @@
+aiohttp
+APScheduler
+async-timeout
+chardet
+discord.py
+emoji
+Flask
+multidict
+python-dotenv
+pytz
+six
+tzlocal
+websockets
+mcstatus
+watchdog
