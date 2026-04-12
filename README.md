@@ -64,7 +64,21 @@ Create a `.env` file (or set env vars directly):
 - `BOT_TOKEN` (required): Discord bot token.
 - `COMMAND_PREFIX` (optional, default: `.`): Command prefix.
 - `NOW_PLAYING` (optional, default: `<prefix>commands`): Presence game text.
+- `STATUS_MESSAGES` (optional): Rotating statuses, separated by `||`, format `type:text`.
+- `STATUS_ROTATION_INTERVAL_SECONDS` (optional, default: `45`): Rotation interval.
 - `PORT` (optional, default: `8080`): Port used by the Flask keep-alive service.
+
+Supported status types:
+
+- `playing`
+- `listening`
+- `watching`
+- `competing`
+
+Supported placeholders inside status text:
+
+- `{prefix}`
+- `{server_members}`
 
 ### Example `.env`
 
@@ -72,6 +86,8 @@ Create a `.env` file (or set env vars directly):
 BOT_TOKEN=your_discord_bot_token
 COMMAND_PREFIX=.
 NOW_PLAYING=.commands
+STATUS_MESSAGES=playing:{prefix}help||playing:helping {server_members} members||listening:beautiful people
+STATUS_ROTATION_INTERVAL_SECONDS=45
 PORT=8080
 ```
 

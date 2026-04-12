@@ -1,4 +1,5 @@
 import sys
+import asyncio
 
 import settings
 import discord
@@ -19,6 +20,64 @@ this.running = False
 sched = AsyncIOScheduler()
 
 
+def _get_server_member_count(client):
+    total = 0
+    for guild in client.guilds:
+        total += guild.member_count or 0
+    return total
+
+
+def _build_activity(activity_type, text):
+    activity_type = activity_type.lower()
+    if activity_type == "listening":
+        return discord.Activity(type=discord.ActivityType.listening, name=text)
+    if activity_type == "watching":
+        return discord.Activity(type=discord.ActivityType.watching, name=text)
+    if activity_type == "competing":
+        return discord.Activity(type=discord.ActivityType.competing, name=text)
+    return discord.Game(name=text)
+
+
+def _parse_status_entry(entry, client):
+    raw = (entry or "").strip()
+    if not raw:
+        return None
+
+    if ":" in raw:
+        activity_type, text = raw.split(":", 1)
+    else:
+        activity_type, text = "playing", raw
+
+    member_count = _get_server_member_count(client)
+    rendered = text.format(
+        prefix=settings.COMMAND_PREFIX,
+        server_members=member_count,
+    ).strip()
+
+    if not rendered:
+        return None
+
+    return _build_activity(activity_type, rendered)
+
+
+async def _rotate_statuses(client):
+    statuses = settings.STATUS_MESSAGES
+    if not statuses:
+        return
+
+    interval = max(10, settings.STATUS_ROTATION_INTERVAL_SECONDS)
+    idx = 0
+    print(f"Status rotation enabled ({len(statuses)} entries)", flush=True)
+
+    while True:
+        activity = _parse_status_entry(statuses[idx], client)
+        if activity is not None:
+            await client.change_presence(activity=activity)
+
+        idx = (idx + 1) % len(statuses)
+        await asyncio.sleep(interval)
+
+
 ###############################################################################
 
 def main():
@@ -27,19 +86,23 @@ def main():
     intents = discord.Intents.default()
     intents.message_content = True
     client = discord.Client(intents=intents)
+    status_task = None
 
     # Define event handlers for the client
     # on_ready may be called multiple times in the event of a reconnect,
     # hence the running flag
     @client.event
     async def on_ready():
+        nonlocal status_task
         if this.running:
             return
 
         this.running = True
 
-        # Set the playing status
-        if settings.NOW_PLAYING:
+        # Set one static status or start rotation (if configured)
+        if settings.STATUS_MESSAGES:
+            status_task = asyncio.create_task(_rotate_statuses(client))
+        elif settings.NOW_PLAYING:
             print("Setting NP game", flush=True)
             await client.change_presence(
                 activity=discord.Game(name=settings.NOW_PLAYING))
