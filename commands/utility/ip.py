@@ -16,7 +16,7 @@ class Ip(BaseCommand):
 
     async def handle(self, params, message, client):
         server_host = "bryxelrealm.wither.host"
-        direct_ip = "23.109.123.215:25614"
+        direct_ip = "170.23.61.130:25910"
 
         try:
             status = await asyncio.to_thread(self._query_server, server_host)
