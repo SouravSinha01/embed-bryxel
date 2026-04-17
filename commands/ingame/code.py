@@ -21,7 +21,7 @@ class Code(BaseCommand):
         )
 
         # Attach the image (same directory as bot or correct path)
-        embed.set_image(url="https://cdn.discordapp.com/attachments/889695047510011974/1490063094607773756/ChatGPT_Image_Apr_5_2026_12_27_58_AM.png?ex=69d2b0e5&is=69d15f65&hm=5d0ee44c980bf7160813cad98d4252c8a86945b798b119c647e9d6bbc7654553&")
+        embed.set_image(url="https://cdn.discordapp.com/attachments/889695047510011974/1494772848668053504/content.png?ex=69e3d332&is=69e281b2&hm=53f9c7bd5b49bd15a7d99fbcff77bbb020106d99248b28212b0ed3003d6e5b4a&")
 
         # Optional polish
         if client.user and client.user.avatar:
