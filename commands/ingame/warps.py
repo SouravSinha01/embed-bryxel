@@ -2,7 +2,7 @@ from commands.base_command import BaseCommand
 import settings
 
 
-class Igm(BaseCommand):
+class Warps(BaseCommand):
 	def __init__(self):
 		description = "Shows the ingame warps menu"
 		params = None
@@ -92,7 +92,7 @@ class Igm(BaseCommand):
 				title="Ingame Warps",
 				description=(
 					f"Select a command from the dropdown for a detailed view.\n"
-					f"You can also use `{settings.COMMAND_PREFIX}igm <command>` to jump directly."
+					f"You can also use `{settings.COMMAND_PREFIX}warp <command>` to jump directly."
 				),
 				color=discord.Color.from_rgb(88, 101, 242),
 			)
@@ -121,7 +121,7 @@ class Igm(BaseCommand):
 			)
 			embed.add_field(name="Usage", value=f"`{item['usage']}`", inline=False)
 			embed.add_field(name="Details", value=item["details"], inline=False)
-			embed.add_field(name="Tip", value=f"Use `{settings.COMMAND_PREFIX}igm` to return to the full list.", inline=False)
+			embed.add_field(name="Tip", value=f"Use `{settings.COMMAND_PREFIX}warp` to return to the full list.", inline=False)
 
 			if item.get("image_url"):
 				embed.set_image(url=item["image_url"])
