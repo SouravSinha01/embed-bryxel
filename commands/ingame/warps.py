@@ -22,7 +22,7 @@ class Warps(BaseCommand):
 				"usage": "/warp ark",
 				"summary": "Teleports you to the current ark.",
 				"details": "Current ARK - EverBlosson ark",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492558374322176192/image.png?ex=69dbc4ce&is=69da734e&hm=f8c6f617e6af546cb10af118e1f2f69b9ee91def18861f7e162395b837e1a111&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495384407509569639/image.png?ex=69e60cc1&is=69e4bb41&hm=fb4eb614cfc328f55ffb858505f1ec62d3a9d1245409e9392a914d0854167444&",
 			},
 			{
 				"key": "warp arkarchive",
@@ -30,7 +30,7 @@ class Warps(BaseCommand):
 				"usage": "/warp arkarchive",
 				"summary": "Teleports you to the arkarchive.",
 				"details": "Access the arkarchive for previous arks.",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492558819098624010/image.png?ex=69dbc538&is=69da73b8&hm=6436f5e9bb26859c3ad27449c5be40fcb06a880621cca740acc5924a9083dffa&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495384686053032066/image.png?ex=69e60d04&is=69e4bb84&hm=555be9bdbc15de4d57d1edb88385695938b90a569ad53022622fe6bcf3d6af09&",
 			},
 			{
 				"key": "warp fishing",
@@ -38,7 +38,7 @@ class Warps(BaseCommand):
 				"usage": "/warp fishing",
 				"summary": "Teleports you to the fishing area.",
 				"details": "Access the fishing area for catching fish in Tournaments.",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492558992017199324/image.png?ex=69dbc562&is=69da73e2&hm=bc963436684bfcd4f8f835d22a323bc1467095606a92e9b9001ea08cf191102c&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495385010344034375/image.png?ex=69e60d51&is=69e4bbd1&hm=11e9601b0e5822b2e2e89e830b8499d6c866ed96b12191ba10cacb1e61b3f7d5&",
 			},
 			{
 				"key": "warp tavern",
@@ -46,7 +46,7 @@ class Warps(BaseCommand):
 				"usage": "/warp tavern",
 				"summary": "Teleports you to the tavern.",
 				"details": "Access the tavern for socializing and earning free AFK money.",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492559182245658795/image.png?ex=69dbc58f&is=69da740f&hm=9d6787d23909e382880316c72c0800e86c1cc0d66a7784b847e76409746d5f45&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495385278842409030/image.png?ex=69e60d91&is=69e4bc11&hm=dcf1a4b6fc9f58d9f4dff52c29b9b641689d325750d343d249e061837a747da9&",
 			},
 			{
 				"key": "warp adept",
@@ -54,7 +54,7 @@ class Warps(BaseCommand):
 				"usage": "/warp adept",
 				"summary": "Teleports you to the Adept for CE's and Transmog orbs.",
 				"details": "Gets you to the Adept for CE's and Transmog orbs[Seasonal Key].",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492559388290842666/image.png?ex=69dbc5c0&is=69da7440&hm=1f743347199f2b81d744e41312275335bfb98bbbfc890541c9d6fd55b0c95b4c&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495385514864545872/image.png?ex=69e60dc9&is=69e4bc49&hm=be498858db2e7c6c2b052e4556418dd17e4c95640b3cfb9b6ff30eca13bcb0bb&",
 			},
 			{
 				"key": "warp pvp",
@@ -62,17 +62,24 @@ class Warps(BaseCommand):
 				"usage": "/warp pvp",
 				"summary": "Teleports you to the PVP area.",
 				"details": "Access the PVP area for competitive gameplay.",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492560122717933778/image.png?ex=69dbc66f&is=69da74ef&hm=bb4bf1b4e764d29bda9c521ec1c131268c54791a5983c0464469fa23aded7a05&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495385927600705617/image.png?ex=69e60e2c&is=69e4bcac&hm=d8cd03840d14de291913996eca01033b45db278f3c66dcab8c166b6c5fdf383c&",
 			},
 			{
 				"key": "warp motm",
 				"label": "motm",
 				"usage": "/warp motm",
-				"summary": "Teleports you to the Merchant of the Month area.",
+				"summary": "Teleports you to the Merchant of the Month area in /warp market	.",
 				"details": "Access to the best selling shop in the game, the Merchant of the Month.",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1492561645535494224/image.png?ex=69dbc7da&is=69da765a&hm=008aa76825c28c1a53ebcaf40f7013696b7d1cca3d29b4af742570c16076aec3&",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495386457987092502/image.png?ex=69e60eaa&is=69e4bd2a&hm=ed90237852396bbf5e3e35ab7399b2fa65b146e1a5b02f984ec75a886b208402&",
 			},
-			
+			{
+				"key": "warp market",
+				"label": "Market",
+				"usage": "/warp market",
+				"summary": "Teleports you to the market.",
+				"details": "Access the market to buy and sell items.",
+				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495387108532293774/image.png?ex=69e60f45&is=69e4bdc5&hm=54e9ffad84951cb3aca6dc34d2d658a0bf66c755bd75e739203d56977e7c1ff8&",
+			}
 		]
 
 		command_map = {item["key"]: item for item in commands}
