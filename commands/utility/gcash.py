@@ -26,7 +26,30 @@ class Gcash(BaseCommand):
 	@classmethod
 	def _format_line(cls, title, usd_amount, detail):
 		php_amount = cls._usd_to_php(usd_amount)
-		return f"• **{title}** - ${usd_amount:g} (~PHP {php_amount:,.2f})\\n  {detail}"
+		return (
+			f"**{title}**\n"
+			f"USD: `${usd_amount:g}` | PHP: `PHP {php_amount:,.2f}`\n"
+			f"{detail}"
+		)
+
+	def _build_embed(self, title, description, body_lines, author, image_url=None):
+		embed = discord.Embed(
+			title=title,
+			description=description,
+			color=discord.Color.from_rgb(39, 174, 96),
+		)
+
+		if body_lines:
+			embed.add_field(name="Pricing", value="\n\n".join(body_lines), inline=False)
+
+		if image_url:
+			embed.set_image(url=image_url)
+
+		embed.set_footer(
+			text=f"Requested by {author.display_name}",
+			icon_url=author.avatar.url if author.avatar else None,
+		)
+		return embed
 
 	async def handle(self, params, message, client):
 		rate = USD_TO_PHP_RATE
@@ -60,67 +83,74 @@ class Gcash(BaseCommand):
 			self._format_line("Collector Relics", 10, "1000 Relics"),
 		]
 
-		embed = discord.Embed(
-			title="GCash Store Pricing | Bryxel Realm",
-			description=(
-				"**IMPORTANT: After paying, open a ticket and attach a screenshot of your payment.**\n\n"
-				"Base prizes and conversion guide for GCash payments.\\n"
-				f"**Conversion used:** $1 = PHP {rate:,.2f}"
+		pages = {
+			"overview": self._build_embed(
+				title="GCash Store Pricing | Bryxel Realm",
+				description=(
+					"**IMPORTANT:** After paying, open a ticket and attach a screenshot of your payment.\n\n"
+					f"**Conversion used:** $1 = PHP {rate:,.2f}\n"
+					"Use the dropdown menu below to view pricing per category."
+				),
+				body_lines=[
+					"1. Choose your item category from the dropdown.",
+					"2. Scan and pay using the GCash QR.",
+					"3. Open a ticket and send payment screenshot.",
+				],
+				author=message.author,
+				image_url=GCASH_QR_IMAGE_URL,
 			),
-			color=discord.Color.from_rgb(39, 174, 96)
-		)
-
-		embed.add_field(name="Patron Ranks", value="\\n\\n".join(patron_lines), inline=False)
-		embed.add_field(name="Realm Keys", value="\\n\\n".join(realm_key_lines), inline=False)
-		embed.add_field(name="Everblosson Keys (Seasonal)", value="\\n\\n".join(everblosson_key_lines), inline=False)
-		embed.add_field(name="Bryxel Relic Packages", value="\\n\\n".join(relic_lines), inline=False)
-		embed.add_field(
-			name="After Payment (Important)",
-			value=(
-				"Open a support ticket right away and send a **screenshot** of your GCash payment "
-				"so staff can verify and deliver your package faster."
+			"ranks": self._build_embed(
+				title="Patron Ranks",
+				description="Gilded and Radient rank pricing.",
+				body_lines=patron_lines,
+				author=message.author,
+				image_url=GCASH_RANKS_IMAGE_URL,
 			),
-			inline=False,
-		)
-		embed.add_field(
-			name="How to Pay via GCash",
-			value=(
-				"1. Pick your package from the list above.\\n"
-				"2. Scan the GCash QR code.\\n"
-				"3. Open a ticket and send your payment screenshot for processing."
+			"realm_keys": self._build_embed(
+				title="Realm Keys",
+				description="Realm Key packages and converted PHP values.",
+				body_lines=realm_key_lines,
+				author=message.author,
+				image_url=GCASH_KEYS_IMAGE_URL,
 			),
-			inline=False,
-		)
+			"everblosson_keys": self._build_embed(
+				title="Everblosson Keys (Seasonal)",
+				description="Seasonal key packages (same pricing as Realm Keys).",
+				body_lines=everblosson_key_lines,
+				author=message.author,
+				image_url=GCASH_KEYS_IMAGE_URL,
+			),
+			"relics": self._build_embed(
+				title="Bryxel Relic Packages",
+				description="Relic packages and converted PHP values.",
+				body_lines=relic_lines,
+				author=message.author,
+				image_url=GCASH_RELICS_IMAGE_URL,
+			),
+		}
 
-		if GCASH_QR_IMAGE_URL:
-			embed.set_image(url=GCASH_QR_IMAGE_URL)
+		class PricingSelect(discord.ui.Select):
+			def __init__(self):
+				options = [
+					discord.SelectOption(label="Overview", value="overview", description="Payment steps and important info", emoji="📌"),
+					discord.SelectOption(label="Patron Ranks", value="ranks", description="Gilded and Radient pricing", emoji="👑"),
+					discord.SelectOption(label="Realm Keys", value="realm_keys", description="7, 15, 32, 64 key packages", emoji="🗝️"),
+					discord.SelectOption(label="Everblosson Keys", value="everblosson_keys", description="Seasonal key pricing", emoji="🌸"),
+					discord.SelectOption(label="Relic Packages", value="relics", description="50 to 1000 relic bundles", emoji="🧿"),
+				]
+				super().__init__(
+					placeholder="Select a pricing category...",
+					min_values=1,
+					max_values=1,
+					options=options,
+				)
 
-		embed.set_footer(
-			text=f"Requested by {message.author.display_name}",
-			icon_url=message.author.avatar.url if message.author.avatar else None,
-		)
+			async def callback(self, interaction):
+				selected_page = self.values[0]
+				await interaction.response.edit_message(embed=pages[selected_page], view=self.view)
 
-		embeds_to_send = [embed]
-
-		optional_image_sections = [
-			("Patron Rank Preview", GCASH_RANKS_IMAGE_URL, "Preview for Gilded and Radient ranks."),
-			("Keys Preview", GCASH_KEYS_IMAGE_URL, "Preview for Realm Keys and Everblosson Keys."),
-			("Relics Preview", GCASH_RELICS_IMAGE_URL, "Preview for Bryxel Relic packages."),
-		]
-
-		for title, image_url, description in optional_image_sections:
-			if not image_url:
-				continue
-
-			preview_embed = discord.Embed(
-				title=title,
-				description=description,
-				color=discord.Color.from_rgb(46, 204, 113),
-			)
-			preview_embed.set_image(url=image_url)
-			embeds_to_send.append(preview_embed)
-
-		view = discord.ui.View()
+		view = discord.ui.View(timeout=300)
+		view.add_item(PricingSelect())
 		view.add_item(discord.ui.Button(
 			label="Open Webshop",
 			style=discord.ButtonStyle.link,
@@ -134,4 +164,4 @@ class Gcash(BaseCommand):
 			emoji="🌐",
 		))
 
-		await message.channel.send(embeds=embeds_to_send, view=view)
+		await message.channel.send(embed=pages["overview"], view=view)
