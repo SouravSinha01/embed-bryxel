@@ -79,6 +79,14 @@ class Warps(BaseCommand):
 				"summary": "Teleports you to the market.",
 				"details": "Access the market to buy and sell items.",
 				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495387108532293774/image.png?ex=69e60f45&is=69e4bdc5&hm=54e9ffad84951cb3aca6dc34d2d658a0bf66c755bd75e739203d56977e7c1ff8&",
+			},
+			{
+				"key": "warp resource",
+				"label": "Resource world ",
+				"usage": "/warp resource",
+				"summary": "Teleports you to the resource area.",
+				"details": "Access the resource area for gathering materials.",
+				"image_url": "https://media.discordapp.net/attachments/889695047510011974/1497507081295495188/image.png?ex=69edc5a6&is=69ec7426&hm=3f7f2c6008030f5c4277a1b9c99d0ecd4ee5c83d9cbd06d711783a8d5e4058f7&=&format=webp&quality=lossless&width=1628&height=856",
 			}
 		]
 
@@ -92,6 +100,8 @@ class Warps(BaseCommand):
             "adept": "warp adept",
             "pvp": "warp pvp",
             "motm": "warp motm",
+			"market": "warp market",
+			"resource": "warp resource",
 		}
 
 		def build_home_embed():
