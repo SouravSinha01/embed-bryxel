@@ -30,7 +30,7 @@ class Vote(BaseCommand):
         view.add_item(discord.ui.Button(
             label="MCLIST",
             style=discord.ButtonStyle.link,
-            url="https://mclist.io/server/66677-bryxelrealm-playsurvival-me-minecraft-1-21-4/vote",
+            url="https://mclist.io/server/75660-bryxelrealm-wither-host-bryxel-realmnow-on-1/vote",
             emoji="🗳️"
         ))
 
