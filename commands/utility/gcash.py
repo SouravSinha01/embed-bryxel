@@ -101,7 +101,7 @@ class Gcash(BaseCommand):
 			),
 			"ranks": self._build_embed(
 				title="Patron Ranks",
-				description="Gilded and Radient rank pricing.",
+				description="Gilded and Radient rank pricing. Please note you can rank up to Radiant after getting Gilded",
 				body_lines=patron_lines,
 				author=message.author,
 				image_url=GCASH_RANKS_IMAGE_URL,
