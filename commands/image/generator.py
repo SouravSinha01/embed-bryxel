@@ -10,6 +10,7 @@ import discord
 
 import settings
 from commands.base_command import BaseCommand
+from commands.image.local_effects_client import LocalEffectsClient
 from commands.image.popcat_client import PopcatClient
 
 
@@ -34,9 +35,19 @@ POPCAT_AVATAR_GENERATORS = {
 	"uncover": "uncover",
 	"wanted": "wanted",
 }
+LOCAL_EFFECTS = {
+	"pixel": "pixel",
+	"mirror": "mirror",
+	"shake": "shake",
+	"burn": "burn",
+	"mosaic": "mosaic",
+	"shatter": "shatter",
+}
 
 
-AVAILABLE_GENERATORS = sorted(POPCAT_AVATAR_GENERATORS.keys())
+AVAILABLE_GENERATORS = sorted(
+	list(POPCAT_AVATAR_GENERATORS.keys()) + list(LOCAL_EFFECTS.keys())
+)
 
 
 class Generator(BaseCommand):
@@ -52,6 +63,10 @@ class Generator(BaseCommand):
 			"{first}, you look a little too hidden.",
 			"{first} is fading out of view.",
 		],
+		"pixel": [
+			"{first} got pixelated.",
+			"{first} needs more resolution.",
+		],
 		"clown": [
 			"{first} is acting like a clown.",
 			"{first} really pulled a clown move.",
@@ -59,6 +74,10 @@ class Generator(BaseCommand):
 		"colorify": [
 			"{first} got a color upgrade.",
 			"{first} got repainted.",
+		],
+		"mirror": [
+			"{first} meets their reflection.",
+			"mirror mirror, which one is {first}?",
 		],
 		"drip": [
 			"{first} is dripping hard.",
@@ -71,6 +90,10 @@ class Generator(BaseCommand):
 		"gun": [
 			"{first} is armed.",
 			"{first} is not to be messed with.",
+		],
+		"shake": [
+			"{first} can't keep still.",
+			"{first} is having a moment.",
 		],
 		"huerotate": [
 			"{first} got a hue shift.",
@@ -92,9 +115,17 @@ class Generator(BaseCommand):
 			"{first} got the M&M treatment.",
 			"{first} turned into candy.",
 		],
+		"burn": [
+			"{first} is on fire.",
+			"too hot to handle: {first}.",
+		],
 		"nokia": [
 			"{first} is on a Nokia screen.",
 			"{first} got shrunk to phone size.",
+		],
+		"mosaic": [
+			"{first} went full Roman mosaic.",
+			"{first} is art now.",
 		],
 		"pet": [
 			"{first} gets the pet-pet.",
@@ -108,6 +139,10 @@ class Generator(BaseCommand):
 			"{first} and {second} are shipped.",
 			"{first} x {second} is looking real.",
 			"relationship status: {first} + {second}.",
+		],
+		"shatter": [
+			"{first} is shattered.",
+			"{first} broke.",
 		],
 		"uncover": [
 			"{first} has been uncovered.",
@@ -169,7 +204,7 @@ class Generator(BaseCommand):
 		secondary_name = self._resolve_display_name(message, extra_params, fallback_index=1)
 		caption = self._build_caption(generator_name, primary_name, secondary_name)
 		status_message = await message.channel.send("Generating image...")
-		generated_buffer, error_message = await self._generate_with_popcat(
+		generated_buffer, error_message = await self._generate(
 			generator_name,
 			image,
 			secondary_image,
@@ -181,20 +216,22 @@ class Generator(BaseCommand):
 			)
 			return
 
-		file = discord.File(fp=generated_buffer, filename="attachment.png")
+		attachment_name = "attachment.gif" if generator_name == "shake" else "attachment.png"
+		file = discord.File(fp=generated_buffer, filename=attachment_name)
 		embed = discord.Embed(
 			title=caption,
 			color=self._get_embed_color(generator_name),
 		)
-		embed.set_image(url="attachment://attachment.png")
+		embed.set_image(url=f"attachment://{attachment_name}")
 		embed.set_footer(text=f"Requested by: {message.author.display_name}")
 		embed.add_field(name="Generator", value=generator_name, inline=True)
 		if generator_name == "ship":
 			ship_percentage = random.randint(1, 100)
 			ship_bar = self._build_percentage_bar(ship_percentage)
+			ship_emoji, ship_text = self._get_ship_result(ship_percentage)
 			embed.add_field(
-				name="Ship Worked",
-				value=f"{ship_bar} {ship_percentage}%",
+				name=f"Ship Worked {ship_emoji}",
+				value=f"{ship_bar} {ship_percentage}% - {ship_text}",
 				inline=False,
 			)
 
@@ -291,6 +328,15 @@ class Generator(BaseCommand):
 		filled_slots = round((percentage / 100) * total_slots)
 		return "█" * filled_slots + "░" * (total_slots - filled_slots)
 
+	def _get_ship_result(self, percentage):
+		if percentage >= 50:
+			return "💖", "strong match"
+
+		if percentage < 10:
+			return "💔", "not a match"
+
+		return "💞", "it could go either way"
+
 	def _get_embed_color(self, generator_name):
 		palette = {
 			"ship": discord.Color.from_rgb(255, 105, 180),
@@ -322,6 +368,37 @@ class Generator(BaseCommand):
 			return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 		except ValueError:
 			return False
+
+	async def _generate(self, generator_name, image, secondary_image=None, sadcat_text=None):
+		"""Route local effects to the Pillow client and the rest to Popcat."""
+		if generator_name in LOCAL_EFFECTS:
+			return await self._generate_local(generator_name, image)
+
+		return await self._generate_with_popcat(
+			generator_name,
+			image,
+			secondary_image,
+			sadcat_text=sadcat_text,
+		)
+
+	async def _generate_local(self, effect_name: str, image_url: str):
+		"""Fetch an image, then apply a local Pillow effect."""
+		timeout = aiohttp.ClientTimeout(total=20)
+		try:
+			async with aiohttp.ClientSession(timeout=timeout) as session:
+				async with session.get(image_url) as resp:
+					if resp.status != 200:
+						return None, "Could not download the image."
+					image_bytes = await resp.read()
+
+			client = LocalEffectsClient()
+			buffer = await client.generate(effect_name, image_bytes)
+			return buffer, None
+
+		except aiohttp.ClientError:
+			return None, "Failed to download the image."
+		except Exception as exc:
+			return None, f"Local effect failed: {exc}"
 
 	async def _generate_with_popcat(self, generator_name, image, secondary_image=None, sadcat_text=None):
 		endpoint = POPCAT_AVATAR_GENERATORS.get(generator_name)
