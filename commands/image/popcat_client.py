@@ -20,6 +20,9 @@ class PopcatClient:
 					raise RuntimeError("`sadcat` needs text. Example: `.sadcat life is tough`")
 				return await self._fetch(session, endpoint, {"text": text_value})
 
+			if endpoint == "huerotate":
+				return await self._fetch(session, endpoint, {"image": image_url, "deg": 120})
+
 			if endpoint == "ship":
 				if not secondary_image_url:
 					raise RuntimeError("`ship` needs two avatars. Mention another user.")
