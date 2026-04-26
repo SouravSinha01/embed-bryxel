@@ -13,3 +13,4 @@ tzlocal
 websockets
 mcstatus
 watchdog
+Pillow
