@@ -30,23 +30,58 @@ POSITION_LABELS = {
 	8: "C3",
 }
 
-DIFFICULTIES = {"easy", "medium", "hard"}
+DIFFICULTY_TOKENS = {
+	"e": "easy",
+	"m": "medium",
+	"h": "hard",
+	"easy": "easy",
+	"medium": "medium",
+	"hard": "hard",
+}
 
 
 class Tictac(BaseCommand):
 	def __init__(self):
 		description = (
-			"Play Tic-Tac-Toe vs a tagged player or the bot with difficulty levels"
+			"Play Tic-Tac-Toe: `.ttt @user` for PvP or `.ttt solo e|m|h` for bot mode"
 		)
-		params = ["@player(optional)", "difficulty(optional: easy|medium|hard)"]
+		params = None
 		aliases = ["ttt", "tictactoe", "tic"]
 		category = "Games"
 		super().__init__(description, params, aliases)
 		self.category = category
 
 	async def handle(self, params, message, client):
+		if not params:
+			await self._send_usage(message)
+			return
+
+		first = params[0].strip().lower()
+		if first == "solo":
+			difficulty = self._parse_solo_difficulty(params[1:])
+			if not difficulty:
+				await message.channel.send(
+					"Invalid solo difficulty. Use `e`, `m`, or `h`.\n"
+					f"Example: `{settings.COMMAND_PREFIX}ttt solo h`"
+				)
+				return
+
+			view = TicTacToeGameView(
+				author=message.author,
+				opponent=client.user,
+				client=client,
+				vs_bot=True,
+				difficulty=difficulty,
+			)
+			embed = view.build_embed()
+			sent = await message.channel.send(embed=embed, view=view)
+			view.message = sent
+			return
+
 		opponent = message.mentions[0] if message.mentions else None
-		difficulty = self._parse_difficulty(params)
+		if not opponent:
+			await self._send_usage(message)
+			return
 
 		if opponent and opponent.id == message.author.id:
 			await message.channel.send("You cannot challenge yourself.")
@@ -67,28 +102,33 @@ class Tictac(BaseCommand):
 			view.message = sent
 			return
 
-		view = TicTacToeGameView(
-			author=message.author,
-			opponent=client.user,
-			client=client,
-			vs_bot=True,
-			difficulty=difficulty,
+		await self._send_usage(message)
+
+	def _parse_solo_difficulty(self, params):
+		if not params:
+			return None
+
+		token = params[0].strip().lower()
+		return DIFFICULTY_TOKENS.get(token)
+
+	async def _send_usage(self, message):
+		embed = discord.Embed(
+			title="Tic-Tac-Toe Usage",
+			description="Use one of the following command formats:",
+			color=discord.Color.blurple(),
 		)
-		embed = view.build_embed()
-		sent = await message.channel.send(embed=embed, view=view)
-		view.message = sent
-
-	def _parse_difficulty(self, params):
-		for raw in params:
-			token = raw.strip().lower()
-			if token in DIFFICULTIES:
-				return token
-			if token.startswith("difficulty="):
-				candidate = token.split("=", 1)[1].strip()
-				if candidate in DIFFICULTIES:
-					return candidate
-
-		return "medium"
+		embed.add_field(
+			name="Play vs Another Player",
+			value=f"`{settings.COMMAND_PREFIX}ttt @user`",
+			inline=False,
+		)
+		embed.add_field(
+			name="Play Solo vs Bot",
+			value=f"`{settings.COMMAND_PREFIX}ttt solo e|m|h`\n`e`=easy, `m`=medium, `h`=hard",
+			inline=False,
+		)
+		embed.set_footer(text="Example: .ttt solo h")
+		await message.channel.send(embed=embed)
 
 
 class TicTacToeChallengeView(discord.ui.View):
