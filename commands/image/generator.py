@@ -1,5 +1,8 @@
 import asyncio
+import io
 import os
+import random
+import time
 from urllib.parse import urlparse
 
 import aiohttp
@@ -7,97 +10,182 @@ import discord
 
 import settings
 from commands.base_command import BaseCommand
+from commands.image.popcat_client import PopcatClient
 
 
-AVAILABLE_GENERATORS = [
-	"ad",
-	"affect",
-	"beautiful",
-	"bobross",
-	"challenger",
-	"confusedstonk",
-	"delete",
-	"dexter",
-	"facepalm",
-	"hitler",
-	"jail",
-	"jokeoverhead",
-	"karaba",
-	"kyon-gun",
-	"mms",
-	"notstonk",
-	"poutine",
-	"rip",
-	"shit",
-	"stonk",
-	"tattoo",
-	"thomas",
-	"trash",
-	"wanted",
-	"worthless",
-]
+POPCAT_AVATAR_GENERATORS = {
+	"ad": "ad",
+	"blur": "blur",
+	"clown": "clown",
+	"colorify": "colorify",
+	"drip": "drip",
+	"greyscale": "greyscale",
+	"gun": "gun",
+	"hue-rotate": "huerotate",
+	"huerotate": "huerotate",
+	"invert": "invert",
+	"jail": "jail",
+	"jokeoverhead": "jokeoverhead",
+	"mnm": "mnm",
+	"nokia": "nokia",
+	"pet": "pet",
+	"sadcat": "sadcat",
+	"ship": "ship",
+	"uncover": "uncover",
+	"wanted": "wanted",
+}
+
+
+AVAILABLE_GENERATORS = sorted(POPCAT_AVATAR_GENERATORS.keys())
 
 
 class Generator(BaseCommand):
+	COOLDOWN_SECONDS = 5
+	GENERATOR_CAPTIONS = {
+		"ad": [
+			"{first} just became an ad.",
+			"{first} is selling something now.",
+			"new ad drop: {first} edition.",
+		],
+		"blur": [
+			"Am I visible, {first}?",
+			"{first}, you look a little too hidden.",
+			"{first} is fading out of view.",
+		],
+		"clown": [
+			"{first} is acting like a clown.",
+			"{first} really pulled a clown move.",
+		],
+		"colorify": [
+			"{first} got a color upgrade.",
+			"{first} got repainted.",
+		],
+		"drip": [
+			"{first} is dripping hard.",
+			"{first} showed up too clean.",
+		],
+		"greyscale": [
+			"{first} lost the colors.",
+			"{first} went full monochrome.",
+		],
+		"gun": [
+			"{first} is armed.",
+			"{first} is not to be messed with.",
+		],
+		"huerotate": [
+			"{first} got a hue shift.",
+			"{first} got color-rotated.",
+		],
+		"invert": [
+			"{first} got inverted.",
+			"{first} turned upside-down on the colors.",
+		],
+		"jail": [
+			"{first} is going to jail.",
+			"{first} got caught red-handed.",
+		],
+		"jokeoverhead": [
+			"{first} did not get the joke.",
+			"the joke flew right over {first}.",
+		],
+		"mnm": [
+			"{first} got the M&M treatment.",
+			"{first} turned into candy.",
+		],
+		"nokia": [
+			"{first} is on a Nokia screen.",
+			"{first} got shrunk to phone size.",
+		],
+		"pet": [
+			"{first} gets the pet-pet.",
+			"{first} is getting head pats.",
+		],
+		"sadcat": [
+			"{first} is now a sad cat.",
+			"{first} looks extremely disappointed.",
+		],
+		"ship": [
+			"{first} and {second} are shipped.",
+			"{first} x {second} is looking real.",
+			"relationship status: {first} + {second}.",
+		],
+		"uncover": [
+			"{first} has been uncovered.",
+			"{first} is no longer hiding.",
+		],
+		"wanted": [
+			"{first} is wanted.",
+			"wanted poster: {first}.",
+		],
+	}
+
 	def __init__(self):
-		description = "Generate a meme image from an avatar, image URL, or attached image"
-		params = ["name(optional)", "@user | image_url(optional)"]
+		description = "Generate Popcat image edits from an avatar, image URL, or attached image"
+		params = []
 		aliases = AVAILABLE_GENERATORS + ["gen", "memegen"]
 		category = "Image"
 		super().__init__(description, params, aliases)
 		self.category = category
+		self._cooldowns = {}
 
 	async def handle(self, params, message, client):
+		cooldown_error = self._check_cooldown(message.author.id)
+		if cooldown_error:
+			await message.channel.send(cooldown_error)
+			return
+
+		self._mark_cooldown(message.author.id)
+
 		invoked = self._get_invoked_name(message)
 		generator_name, extra_params = self._resolve_generator(invoked, params)
 
 		if not generator_name:
-			examples = (
-				f"`{settings.COMMAND_PREFIX}generator wanted @user`\n"
-				f"`{settings.COMMAND_PREFIX}generator ad https://example.com/image.png`\n"
-				f"`{settings.COMMAND_PREFIX}ad @user`"
-			)
 			await message.channel.send(
-				"Please provide a valid generator name.\n"
-				f"Available: {', '.join(AVAILABLE_GENERATORS)}\n\n"
-				f"Examples:\n{examples}"
+				f"Available: {', '.join(AVAILABLE_GENERATORS)}\n"
+				f"Example: `{settings.COMMAND_PREFIX}wanted @user`"
 			)
 			return
 
-		image = self._get_image_from_message(message, extra_params)
-		if not image:
-			await message.channel.send(
-				"Could not find an image. Mention a user, provide an image URL, "
-				"or attach an image."
-			)
-			return
+		sadcat_text = None
+		if generator_name == "sadcat":
+			sadcat_text = self._get_sadcat_text(message, extra_params)
+			if not sadcat_text:
+				await message.channel.send(
+					f"`sadcat` needs text. Example: `{settings.COMMAND_PREFIX}sadcat life is tough`"
+				)
+				return
+			image = ""
+		else:
+			image = self._get_image_from_message(message, extra_params)
+			if not image:
+				await message.channel.send(
+					"Could not find an image. Mention a user, provide an image URL, "
+					"or attach an image."
+				)
+				return
 
-		api_key = os.environ.get("STRANGE_API_KEY")
-		if not api_key:
-			await message.channel.send(
-				"Missing `STRANGE_API_KEY` in environment variables."
-			)
-			return
-
-		base_api = os.environ.get("IMAGE_BASE_API") or os.environ.get("IMAGE_BASE_API_URL")
-		if not base_api:
-			await message.channel.send(
-				"Missing `IMAGE_BASE_API` or `IMAGE_BASE_API_URL` in environment variables."
-			)
-			return
-
-		endpoint = self._get_generator_url(base_api, generator_name, image)
-
+		secondary_image = self._get_secondary_image_for_ship(message, extra_params)
+		primary_name = self._resolve_display_name(message, extra_params, fallback_index=0)
+		secondary_name = self._resolve_display_name(message, extra_params, fallback_index=1)
+		caption = self._build_caption(generator_name, primary_name, secondary_name)
 		status_message = await message.channel.send("Generating image...")
-		generated_bytes = await self._fetch_buffer(endpoint, api_key)
-		if not generated_bytes:
+		generated_buffer, error_message = await self._generate_with_popcat(
+			generator_name,
+			image,
+			secondary_image,
+			sadcat_text=sadcat_text,
+		)
+		if not generated_buffer:
 			await status_message.edit(
-				content="Failed to generate image. Please try again in a few moments."
+				content=error_message or "Failed to generate image. Please try again in a few moments."
 			)
 			return
 
-		file = discord.File(fp=generated_bytes, filename="attachment.png")
-		embed = discord.Embed(color=discord.Color.from_rgb(52, 152, 219))
+		file = discord.File(fp=generated_buffer, filename="attachment.png")
+		embed = discord.Embed(
+			title=caption,
+			color=self._get_embed_color(generator_name),
+		)
 		embed.set_image(url="attachment://attachment.png")
 		embed.set_footer(text=f"Requested by: {message.author.display_name}")
 		embed.add_field(name="Generator", value=generator_name, inline=True)
@@ -163,6 +251,58 @@ class Generator(BaseCommand):
 
 		return message.author.display_avatar.with_size(256).with_format("png").url
 
+	def _resolve_display_name(self, message, params, fallback_index=0):
+		if len(message.mentions) > fallback_index:
+			return message.mentions[fallback_index].display_name
+
+		if len(params) > fallback_index:
+			candidate = params[fallback_index].strip()
+			if candidate.isdigit() and message.guild:
+				member = message.guild.get_member(int(candidate))
+				if member:
+					return member.display_name
+
+		return message.author.display_name
+
+	def _get_sadcat_text(self, message, params):
+		if params:
+			return " ".join(p.strip() for p in params if p.strip())
+
+		return None
+
+	def _build_caption(self, generator_name, first_name, second_name):
+		variants = self.GENERATOR_CAPTIONS.get(generator_name)
+		if variants:
+			template = random.choice(variants)
+			return template.format(first=first_name, second=second_name)
+
+		return f"Generated for {first_name}."
+
+	def _get_embed_color(self, generator_name):
+		palette = {
+			"ship": discord.Color.from_rgb(255, 105, 180),
+			"wanted": discord.Color.from_rgb(231, 76, 60),
+			"jail": discord.Color.from_rgb(155, 89, 182),
+			"blur": discord.Color.from_rgb(52, 152, 219),
+			"ad": discord.Color.from_rgb(241, 196, 15),
+		}
+		return palette.get(generator_name, discord.Color.from_rgb(52, 152, 219))
+
+	def _get_secondary_image_for_ship(self, message, params):
+		if len(message.mentions) >= 2:
+			return message.mentions[1].display_avatar.with_size(256).with_format("png").url
+
+		if len(params) >= 2:
+			candidate = params[1].strip()
+			if self._is_url(candidate):
+				return candidate
+			if candidate.isdigit() and message.guild:
+				member = message.guild.get_member(int(candidate))
+				if member:
+					return member.display_avatar.with_size(256).with_format("png").url
+
+		return None
+
 	def _is_url(self, value):
 		try:
 			parsed = urlparse(value)
@@ -170,23 +310,68 @@ class Generator(BaseCommand):
 		except ValueError:
 			return False
 
-	def _get_generator_url(self, base_api, generator_name, image):
-		from urllib.parse import urlencode
+	async def _generate_with_popcat(self, generator_name, image, secondary_image=None, sadcat_text=None):
+		endpoint = POPCAT_AVATAR_GENERATORS.get(generator_name)
+		if not endpoint:
+			return None, f"`{generator_name}` is not mapped to a Popcat endpoint."
 
-		query = urlencode({"image": image})
-		return f"{base_api.rstrip('/')}/generators/{generator_name}?{query}"
+		if endpoint == "ship" and not secondary_image:
+			return None, "`ship` requires two users/images. Example: `.ship @user1 @user2`."
 
-	async def _fetch_buffer(self, url, api_key):
-		headers = {
-			"Authorization": f"Bearer {api_key}",
-		}
+		base_url = os.environ.get("POPCAT_BASE_URL", "https://api.popcat.xyz")
 
-		timeout = aiohttp.ClientTimeout(total=25)
+		timeout = aiohttp.ClientTimeout(total=40)
 		async with aiohttp.ClientSession(timeout=timeout) as session:
 			try:
-				async with session.get(url, headers=headers) as response:
-					if response.status != 200:
-						return None
-					return await response.read()
+				client = PopcatClient(base_url=base_url, session=session)
+				result = await client.generate(
+					endpoint,
+					image,
+					secondary_image_url=secondary_image,
+					text_value=sadcat_text,
+				)
+				buffer = self._to_buffer(result)
+				if not buffer:
+					return None, "Popcat returned an invalid image payload."
+
+				return buffer, None
 			except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+				return None, "Popcat request failed or timed out."
+			except RuntimeError as exc:
+				return None, f"Popcat error: {exc}"
+			except Exception:
+				return None, "Popcat generation failed unexpectedly."
+
+	def _to_buffer(self, value):
+		if isinstance(value, io.BytesIO):
+			value.seek(0)
+			return value
+
+		if isinstance(value, (bytes, bytearray)):
+			return io.BytesIO(value)
+
+		if hasattr(value, "read"):
+			try:
+				if hasattr(value, "seek"):
+					value.seek(0)
+				return value
+			except Exception:
 				return None
+
+		return None
+
+	def _check_cooldown(self, user_id):
+		now = time.monotonic()
+		expires_at = self._cooldowns.get(user_id)
+		if not expires_at:
+			return None
+
+		if now >= expires_at:
+			del self._cooldowns[user_id]
+			return None
+
+		remaining = expires_at - now
+		return f"Please wait {remaining:.1f} seconds before using this command again."
+
+	def _mark_cooldown(self, user_id):
+		self._cooldowns[user_id] = time.monotonic() + self.COOLDOWN_SECONDS

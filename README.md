@@ -67,6 +67,7 @@ Create a `.env` file (or set env vars directly):
 - `STATUS_MESSAGES` (optional): Rotating statuses, separated by `||`, format `type:text`.
 - `STATUS_ROTATION_INTERVAL_SECONDS` (optional, default: `45`): Rotation interval.
 - `PORT` (optional, default: `8080`): Port used by the Flask keep-alive service.
+- `POPCAT_BASE_URL` (optional, default: `https://api.popcat.xyz`): Base URL for Popcat API.
 
 Supported status types:
 
@@ -89,7 +90,20 @@ NOW_PLAYING=.commands
 STATUS_MESSAGES=playing:{prefix}help||playing:helping {server_members} members||listening:beautiful people
 STATUS_ROTATION_INTERVAL_SECONDS=45
 PORT=8080
+POPCAT_BASE_URL=https://api.popcat.xyz
 ```
+
+The image generator command now uses Popcat API endpoints that are avatar/image friendly:
+
+- `ad`, `blur`, `clown`, `colorify`, `communism`, `drip`, `greyscale`, `gun`
+- `huerotate`/`hue-rotate`, `invert`, `jail`, `jokeoverhead`, `mnm`, `nokia`, `pet`
+- `sadcat`, `ship`, `uncover`, `wanted`
+
+Usage examples:
+
+- `.gen wanted @user`
+- `.gen ad https://example.com/image.png`
+- `.ship @user1 @user2`
 
 ## Setup
 
