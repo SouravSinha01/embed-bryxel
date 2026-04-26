@@ -189,6 +189,14 @@ class Generator(BaseCommand):
 		embed.set_image(url="attachment://attachment.png")
 		embed.set_footer(text=f"Requested by: {message.author.display_name}")
 		embed.add_field(name="Generator", value=generator_name, inline=True)
+		if generator_name == "ship":
+			ship_percentage = random.randint(1, 100)
+			ship_bar = self._build_percentage_bar(ship_percentage)
+			embed.add_field(
+				name="Ship Worked",
+				value=f"{ship_bar} {ship_percentage}%",
+				inline=False,
+			)
 
 		try:
 			await status_message.delete()
@@ -277,6 +285,11 @@ class Generator(BaseCommand):
 			return template.format(first=first_name, second=second_name)
 
 		return f"Generated for {first_name}."
+
+	def _build_percentage_bar(self, percentage):
+		total_slots = 10
+		filled_slots = round((percentage / 100) * total_slots)
+		return "█" * filled_slots + "░" * (total_slots - filled_slots)
 
 	def _get_embed_color(self, generator_name):
 		palette = {
