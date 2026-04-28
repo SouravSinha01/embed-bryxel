@@ -12,6 +12,7 @@ import settings
 from commands.base_command import BaseCommand
 from commands.image.local_effects_client import LocalEffectsClient
 from commands.image.popcat_client import PopcatClient
+from rate_limiter import get_global_limiter
 
 
 POPCAT_AVATAR_GENERATORS = {
@@ -51,7 +52,7 @@ AVAILABLE_GENERATORS = sorted(
 
 
 class Generator(BaseCommand):
-	COOLDOWN_SECONDS = 5
+	COOLDOWN_SECONDS = 15  # Increased from 5s to prevent API spam with multiple concurrent users
 	GENERATOR_CAPTIONS = {
 		"ad": [
 			"{first} just became an ad.",
@@ -166,7 +167,14 @@ class Generator(BaseCommand):
 	async def handle(self, params, message, client):
 		cooldown_error = self._check_cooldown(message.author.id)
 		if cooldown_error:
-			await message.channel.send(cooldown_error)
+			try:
+				await message.channel.send(cooldown_error)
+			except discord.errors.HTTPException as e:
+				if e.status == 429:
+					# Hit rate limit on the error message itself, just skip it
+					pass
+				else:
+					raise
 			return
 
 		self._mark_cooldown(message.author.id)
@@ -175,8 +183,9 @@ class Generator(BaseCommand):
 		generator_name, extra_params = self._resolve_generator(invoked, params)
 
 		if not generator_name:
-			await message.channel.send(
-				f"Available: {', '.join(AVAILABLE_GENERATORS)}\n"
+			await self._safe_send(
+				message.channel,
+				content=f"Available: {', '.join(AVAILABLE_GENERATORS)}\n"
 				f"Example: `{settings.COMMAND_PREFIX}wanted @user`"
 			)
 			return
@@ -185,16 +194,18 @@ class Generator(BaseCommand):
 		if generator_name == "sadcat":
 			sadcat_text = self._get_sadcat_text(message, extra_params)
 			if not sadcat_text:
-				await message.channel.send(
-					f"`sadcat` needs text. Example: `{settings.COMMAND_PREFIX}sadcat life is tough`"
+				await self._safe_send(
+					message.channel,
+					content=f"`sadcat` needs text. Example: `{settings.COMMAND_PREFIX}sadcat life is tough`"
 				)
 				return
 			image = ""
 		else:
 			image = self._get_image_from_message(message, extra_params)
 			if not image:
-				await message.channel.send(
-					"Could not find an image. Mention a user, provide an image URL, "
+				await self._safe_send(
+					message.channel,
+					content="Could not find an image. Mention a user, provide an image URL, "
 					"or attach an image."
 				)
 				return
@@ -203,7 +214,10 @@ class Generator(BaseCommand):
 		primary_name = self._resolve_display_name(message, extra_params, fallback_index=0)
 		secondary_name = self._resolve_display_name(message, extra_params, fallback_index=1)
 		caption = self._build_caption(generator_name, primary_name, secondary_name)
-		status_message = await message.channel.send("Generating image...")
+		status_message = await self._safe_send(message.channel, content="Generating image...")
+		if not status_message:
+			# Rate limited, skip generation
+			return
 		generated_buffer, error_message = await self._generate(
 			generator_name,
 			image,
@@ -211,7 +225,8 @@ class Generator(BaseCommand):
 			sadcat_text=sadcat_text,
 		)
 		if not generated_buffer:
-			await status_message.edit(
+			await self._safe_send(
+				status_message,
 				content=error_message or "Failed to generate image. Please try again in a few moments."
 			)
 			return
@@ -237,10 +252,10 @@ class Generator(BaseCommand):
 
 		try:
 			await status_message.delete()
-		except discord.DiscordException:
+		except (discord.DiscordException, AttributeError):
 			pass
 
-		await message.channel.send(embed=embed, file=file)
+		await self._safe_send(message.channel, embed=embed, file=file)
 
 	def _get_invoked_name(self, message):
 		content = message.content or ""
@@ -465,3 +480,19 @@ class Generator(BaseCommand):
 
 	def _mark_cooldown(self, user_id):
 		self._cooldowns[user_id] = time.monotonic() + self.COOLDOWN_SECONDS
+
+	async def _safe_send(self, channel, **kwargs):
+		"""Send a message to Discord with 429 error handling.
+		
+		If hit with a global rate limit (429), returns None without sending.
+		Otherwise raises the exception for caller to handle.
+		"""
+		try:
+			# Acquire rate limit token before sending
+			await get_global_limiter().acquire()
+			return await channel.send(**kwargs)
+		except discord.errors.HTTPException as e:
+			if e.status == 429:
+				# Global rate limit hit - don't retry, just give up
+				return None
+			raise
