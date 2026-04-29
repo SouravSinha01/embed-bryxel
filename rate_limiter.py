@@ -33,29 +33,21 @@ class GlobalRateLimiter:
 		"""
 		Acquire permission to make a request. Blocks if rate limit would be exceeded.
 		"""
-		async with self.lock:
-			now = time.time()
-			
-			# Remove timestamps outside the current window
-			while self.request_times and self.request_times[0] < now - self.window_size:
-				self.request_times.popleft()
-			
-			# If we've hit the limit, calculate how long to wait
-			while len(self.request_times) >= self.max_requests:
-				# Wait until the oldest request falls outside the window
-				oldest_time = self.request_times[0]
-				sleep_time = (oldest_time + self.window_size - now) + 0.01
-				
-				# Release lock while we sleep to allow other tasks to check
-				await asyncio.sleep(sleep_time)
-				
-				# Re-acquire and recalculate
+		while True:
+			async with self.lock:
 				now = time.time()
+
 				while self.request_times and self.request_times[0] < now - self.window_size:
 					self.request_times.popleft()
-			
-			# Record this request
-			self.request_times.append(now)
+
+				if len(self.request_times) < self.max_requests:
+					self.request_times.append(now)
+					return
+
+				oldest_time = self.request_times[0]
+				sleep_time = max(0.0, (oldest_time + self.window_size - now) + 0.01)
+
+			await asyncio.sleep(sleep_time)
 	
 	def get_requests_in_last_second(self) -> int:
 		"""Get the number of requests made in the last second."""

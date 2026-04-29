@@ -168,7 +168,7 @@ class Generator(BaseCommand):
 		cooldown_error = self._check_cooldown(message.author.id)
 		if cooldown_error:
 			try:
-				await message.channel.send(cooldown_error)
+				await self._safe_send(message.channel, content=cooldown_error)
 			except discord.errors.HTTPException as e:
 				if e.status == 429:
 					# Hit rate limit on the error message itself, just skip it

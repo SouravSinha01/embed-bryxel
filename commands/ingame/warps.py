@@ -214,5 +214,5 @@ class Warps(BaseCommand):
 		else:
 			embed = build_home_embed()
 
-		await message.channel.send(embed=embed, view=view)
+		await self._safe_send(message.channel, embed=embed, view=view)
 

@@ -29,8 +29,11 @@ class Ticket(BaseCommand):
         current_page = 0
         
         # Send the initial message with the first page
-        guide_msg = await message.channel.send(embed=pages[current_page], 
-                                               view=PaginatorView(pages, current_page, message.author.id))
+        guide_msg = await self._safe_send(
+            message.channel,
+            embed=pages[current_page],
+            view=PaginatorView(pages, current_page, message.author.id),
+        )
 
     def _create_intro_page(self):
         embed = discord.Embed(

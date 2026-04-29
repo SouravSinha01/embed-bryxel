@@ -32,7 +32,4 @@ class Code(BaseCommand):
             icon_url=message.author.avatar.url if message.author.avatar else None
         )
 
-        await message.channel.send(
-           
-            embed=embed
-        )
+        await self._safe_send(message.channel, embed=embed)

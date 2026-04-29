@@ -50,4 +50,4 @@ class Donate(BaseCommand):
             emoji="🌐"
         ))
 
-        await message.channel.send(embed=embed, view=view)
+        await self._safe_send(message.channel, embed=embed, view=view)

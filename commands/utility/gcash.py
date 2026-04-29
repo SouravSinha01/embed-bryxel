@@ -164,4 +164,4 @@ class Gcash(BaseCommand):
 			emoji="🌐",
 		))
 
-		await message.channel.send(embed=pages["overview"], view=view)
+		await self._safe_send(message.channel, embed=pages["overview"], view=view)

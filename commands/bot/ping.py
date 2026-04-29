@@ -28,7 +28,9 @@ class Ping(BaseCommand):
 
     async def handle(self, params, message, client):
         start = time.perf_counter()
-        placeholder = await message.channel.send("🏓 Pinging...")
+        placeholder = await self._safe_send(message.channel, content="🏓 Pinging...")
+        if not placeholder:
+            return
         elapsed_ms = (time.perf_counter() - start) * 1000
 
         discord_version = getattr(discord, "__version__", "unknown")

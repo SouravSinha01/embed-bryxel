@@ -60,8 +60,9 @@ class Tictac(BaseCommand):
 		if first == "solo":
 			difficulty = self._parse_solo_difficulty(params[1:])
 			if not difficulty:
-				await message.channel.send(
-					"Invalid solo difficulty. Use `e`, `m`, or `h`.\n"
+				await self._safe_send(
+					message.channel,
+					content="Invalid solo difficulty. Use `e`, `m`, or `h`.\n"
 					f"Example: `{settings.COMMAND_PREFIX}ttt solo h`"
 				)
 				return
@@ -74,7 +75,7 @@ class Tictac(BaseCommand):
 				difficulty=difficulty,
 			)
 			embed = view.build_embed()
-			sent = await message.channel.send(embed=embed, view=view)
+			sent = await self._safe_send(message.channel, embed=embed, view=view)
 			view.message = sent
 			return
 
@@ -84,11 +85,11 @@ class Tictac(BaseCommand):
 			return
 
 		if opponent and opponent.id == message.author.id:
-			await message.channel.send("You cannot challenge yourself.")
+			await self._safe_send(message.channel, content="You cannot challenge yourself.")
 			return
 
 		if opponent and opponent.bot and opponent.id != getattr(client.user, "id", None):
-			await message.channel.send("You can challenge a member or play solo against me.")
+			await self._safe_send(message.channel, content="You can challenge a member or play solo against me.")
 			return
 
 		if opponent and opponent.id != getattr(client.user, "id", None):
@@ -98,7 +99,7 @@ class Tictac(BaseCommand):
 				client=client,
 			)
 			embed = view.build_embed()
-			sent = await message.channel.send(embed=embed, view=view)
+			sent = await self._safe_send(message.channel, embed=embed, view=view)
 			view.message = sent
 			return
 
@@ -128,7 +129,7 @@ class Tictac(BaseCommand):
 			inline=False,
 		)
 		embed.set_footer(text="Example: .ttt solo h")
-		await message.channel.send(embed=embed)
+		await self._safe_send(message.channel, embed=embed)
 
 
 class TicTacToeChallengeView(discord.ui.View):

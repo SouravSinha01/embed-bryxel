@@ -34,8 +34,9 @@ class Avatar(BaseCommand):
             target = message.author if not params else None
 
         if target is None:
-            await message.channel.send(
-                f"Usage: `{settings.COMMAND_PREFIX}avatar @user` or `{settings.COMMAND_PREFIX}avatar <user_id>`"
+            await self._safe_send(
+                message.channel,
+                content=f"Usage: `{settings.COMMAND_PREFIX}avatar @user` or `{settings.COMMAND_PREFIX}avatar <user_id>`"
             )
             return
 
@@ -57,4 +58,4 @@ class Avatar(BaseCommand):
             icon_url=message.author.avatar.url if message.author.avatar else None
         )
 
-        await message.channel.send(embed=embed)
+        await self._safe_send(message.channel, embed=embed)

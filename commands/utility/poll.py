@@ -31,22 +31,24 @@ class Poll(BaseCommand):
 				inline=False,
 			)
 			embed.set_footer(text="You need at least 2 options to start a poll.")
-			await message.channel.send(embed=embed)
+			await self._safe_send(message.channel, embed=embed)
 			return
 
 		raw_content = message.content[len(settings.COMMAND_PREFIX) :].strip()
 		command_part = raw_content.split(maxsplit=1)
 		if len(command_part) < 2:
-			await message.channel.send(
-				f"Usage: `{settings.COMMAND_PREFIX}poll Question | Option 1 | Option 2 [| duration=10m]`"
+			await self._safe_send(
+				message.channel,
+				content=f"Usage: `{settings.COMMAND_PREFIX}poll Question | Option 1 | Option 2 [| duration=10m]`"
 			)
 			return
 
 		payload = command_part[1].strip()
 		segments = [segment.strip() for segment in payload.split("|") if segment.strip()]
 		if len(segments) < 3:
-			await message.channel.send(
-				"Please provide a question and at least 2 options using `|` separators.\n"
+			await self._safe_send(
+				message.channel,
+				content="Please provide a question and at least 2 options using `|` separators.\n"
 				f"Example: `{settings.COMMAND_PREFIX}poll Best feature? | Help menu | Polls | Events`"
 			)
 			return
@@ -57,8 +59,9 @@ class Poll(BaseCommand):
 			duration_value = last_segment.split("=", 1)[1].strip()
 			parsed_duration = self._parse_duration(duration_value)
 			if parsed_duration is None:
-				await message.channel.send(
-					"Invalid duration. Use values like `30s`, `10m`, `2h`, or `1d`."
+				await self._safe_send(
+					message.channel,
+					content="Invalid duration. Use values like `30s`, `10m`, `2h`, or `1d`."
 				)
 				return
 			duration_seconds = parsed_duration
@@ -68,21 +71,22 @@ class Poll(BaseCommand):
 		options = segments[1:]
 
 		if len(options) < 2:
-			await message.channel.send("Please provide at least two poll options.")
+			await self._safe_send(message.channel, content="Please provide at least two poll options.")
 			return
 
 		if len(options) > 10:
-			await message.channel.send("Please keep polls to 10 options or fewer.")
+			await self._safe_send(message.channel, content="Please keep polls to 10 options or fewer.")
 			return
 
 		if len(question) > 256:
-			await message.channel.send("Poll question is too long. Keep it under 256 characters.")
+			await self._safe_send(message.channel, content="Poll question is too long. Keep it under 256 characters.")
 			return
 
 		for option in options:
 			if len(option) > 80:
-				await message.channel.send(
-					f"Option too long: `{option[:40]}...`\nKeep each option under 80 characters."
+				await self._safe_send(
+					message.channel,
+					content=f"Option too long: `{option[:40]}...`\nKeep each option under 80 characters."
 				)
 				return
 
@@ -94,7 +98,7 @@ class Poll(BaseCommand):
 			client=client,
 		)
 		embed = poll_view.build_embed(active=True)
-		sent_message = await message.channel.send(embed=embed, view=poll_view)
+		sent_message = await self._safe_send(message.channel, embed=embed, view=poll_view)
 		poll_view.message = sent_message
 
 	def _parse_duration(self, value):
