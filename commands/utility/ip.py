@@ -47,7 +47,7 @@ class Ip(BaseCommand):
 
         embed.set_footer(text="mcstatus checks the Java server status protocol for live info.")
 
-        await message.channel.send(embed=embed)
+        await self._safe_send(message.channel, embed=embed)
 
     def _query_server(self, server_host):
         server = JavaServer.lookup(server_host, timeout=3)

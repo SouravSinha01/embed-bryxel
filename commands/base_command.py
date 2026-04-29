@@ -1,3 +1,5 @@
+import discord
+
 import settings
 
 # Base command class
@@ -17,3 +19,11 @@ class BaseCommand:
             desc += " " + " ".join(f"*<{p}>*" for p in params)
         desc += f": {description}."
         self.description = desc
+
+    async def _safe_send(self, channel, **kwargs):
+        try:
+            return await channel.send(**kwargs)
+        except discord.errors.HTTPException as exc:
+            if exc.status == 429:
+                return None
+            raise
