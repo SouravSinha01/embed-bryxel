@@ -31,15 +31,15 @@ class Vote(BaseCommand):
             label="MCLIST",
             style=discord.ButtonStyle.link,
             url="https://mclist.io/server/75660-bryxelrealm-wither-host-bryxel-realmnow-on-1/vote",
-            emoji="🗳️"
+            emoji="🚶‍♂️‍➡️"
         ))
 
         # MINECRAFT SERVERS-NET
         view.add_item(discord.ui.Button(
-            label="MINECRAFT SERVERS-NET",
+            label="MINECRAFT SERVERS-ORG",
             style=discord.ButtonStyle.link,
-            url="https://minecraft-server.net/vote/BryxelRealm/",
-            emoji="🌐"
+            url="https://minecraftservers.org/vote/685373",
+            emoji="🚶‍➡️"
         ))
 
         # MINECRAFT MP
@@ -47,7 +47,7 @@ class Vote(BaseCommand):
             label="MINECRAFT MP",
             style=discord.ButtonStyle.link,
             url="https://minecraft-mp.com/server/347865/vote/",
-            emoji="🎯"
+            emoji="🚶‍♀️"
         ))
 
         # TOPMINECRAFTSERVERS
@@ -55,7 +55,7 @@ class Vote(BaseCommand):
             label="TOPMINECRAFTSERVERS",
             style=discord.ButtonStyle.link,
             url="https://topminecraftservers.org/server/41157",
-            emoji="⭐"
+            emoji="🚶‍♂️"
         ))
 
         # MINECRAFT.BUZZ
@@ -63,7 +63,7 @@ class Vote(BaseCommand):
             label="MINECRAFT.BUZZ",
             style=discord.ButtonStyle.link,
             url="https://minecraft.buzz/vote/17488",
-            emoji="🐝"
+            emoji="🏃"
         ))
 
         await self._safe_send(message.channel, embed=embed, view=view)
