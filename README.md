@@ -101,20 +101,16 @@ PORT=8080
 POPCAT_BASE_URL=https://api.popcat.xyz
 ```
 
-Run `.gen` to see the available effects and examples. A generated image replaces the progress message as a plain attachment in the format returned by the effect.
+The image generator command now uses Popcat API endpoints that are avatar/image friendly:
 
-Popcat-backed effects:
-
-- `achievement` (custom text, for example `.gen achievement Built a castle`)
-- `ad`, `blur`, `clown`, `colorify`, `drip`, `greyscale`, `gun`
+- `achievement` (custom text), `ad`, `blur`, `clown`, `colorify`, `drip`, `greyscale`, `gun`
 - `huerotate`/`hue-rotate`, `invert`, `jail`, `jokeoverhead`, `mnm`, `nokia`, `pet`
 - `sadcat`, `ship`, `uncover`, `wanted`
-
-Local effects: `pixel`, `mirror`, `shake`, `burn`, `mosaic`, `shatter`.
 
 Usage examples:
 
 - `.gen wanted @user`
+- `.gen achievement Built a castle`
 - `.gen ad https://example.com/image.png`
 - `.ship @user1 @user2`
 

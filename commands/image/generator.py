@@ -1,6 +1,7 @@
 import asyncio
 import io
 import os
+import random
 import time
 from urllib.parse import urlparse
 
@@ -44,7 +45,6 @@ LOCAL_EFFECTS = {
 	"mosaic": "mosaic",
 	"shatter": "shatter",
 }
-TEXT_GENERATORS = {"achievement", "sadcat"}
 
 
 AVAILABLE_GENERATORS = sorted(
@@ -54,6 +54,108 @@ AVAILABLE_GENERATORS = sorted(
 
 class Generator(BaseCommand):
 	COOLDOWN_SECONDS = 15  # Increased from 5s to prevent API spam with multiple concurrent users
+	GENERATOR_CAPTIONS = {
+		"ad": [
+			"{first} just became an ad.",
+			"{first} is selling something now.",
+			"new ad drop: {first} edition.",
+		],
+		"blur": [
+			"Am I visible, {first}?",
+			"{first}, you look a little too hidden.",
+			"{first} is fading out of view.",
+		],
+		"pixel": [
+			"{first} got pixelated.",
+			"{first} needs more resolution.",
+		],
+		"clown": [
+			"{first} is acting like a clown.",
+			"{first} really pulled a clown move.",
+		],
+		"colorify": [
+			"{first} got a color upgrade.",
+			"{first} got repainted.",
+		],
+		"mirror": [
+			"{first} meets their reflection.",
+			"mirror mirror, which one is {first}?",
+		],
+		"drip": [
+			"{first} is dripping hard.",
+			"{first} showed up too clean.",
+		],
+		"greyscale": [
+			"{first} lost the colors.",
+			"{first} went full monochrome.",
+		],
+		"gun": [
+			"{first} is armed.",
+			"{first} is not to be messed with.",
+		],
+		"shake": [
+			"{first} can't keep still.",
+			"{first} is having a moment.",
+		],
+		"huerotate": [
+			"{first} got a hue shift.",
+			"{first} got color-rotated.",
+		],
+		"invert": [
+			"{first} got inverted.",
+			"{first} turned upside-down on the colors.",
+		],
+		"jail": [
+			"{first} is going to jail.",
+			"{first} got caught red-handed.",
+		],
+		"jokeoverhead": [
+			"{first} did not get the joke.",
+			"the joke flew right over {first}.",
+		],
+		"mnm": [
+			"{first} got the M&M treatment.",
+			"{first} turned into candy.",
+		],
+		"burn": [
+			"{first} is on fire.",
+			"too hot to handle: {first}.",
+		],
+		"nokia": [
+			"{first} is on a Nokia screen.",
+			"{first} got shrunk to phone size.",
+		],
+		"mosaic": [
+			"{first} went full Roman mosaic.",
+			"{first} is art now.",
+		],
+		"pet": [
+			"{first} gets the pet-pet.",
+			"{first} is getting head pats.",
+		],
+		"sadcat": [
+			"{first} is now a sad cat.",
+			"{first} looks extremely disappointed.",
+		],
+		"ship": [
+			"{first} and {second} are shipped.",
+			"{first} x {second} is looking real.",
+			"relationship status: {first} + {second}.",
+		],
+		"shatter": [
+			"{first} is shattered.",
+			"{first} broke.",
+		],
+		"uncover": [
+			"{first} has been uncovered.",
+			"{first} is no longer hiding.",
+		],
+		"wanted": [
+			"{first} is wanted.",
+			"wanted poster: {first}.",
+		],
+	}
+
 	def __init__(self):
 		description = "Generate Popcat image edits from an avatar, image URL, or attached image"
 		params = []
@@ -64,12 +166,6 @@ class Generator(BaseCommand):
 		self._cooldowns = {}
 
 	async def handle(self, params, message, client):
-		invoked = self._get_invoked_name(message)
-		generator_name, extra_params = self._resolve_generator(invoked, params)
-		if not generator_name:
-			await self._safe_send(message.channel, embed=self._build_help_embed())
-			return
-
 		cooldown_error = self._check_cooldown(message.author.id)
 		if cooldown_error:
 			try:
@@ -82,17 +178,30 @@ class Generator(BaseCommand):
 					raise
 			return
 
-		text_value = None
-		if generator_name in TEXT_GENERATORS:
-			text_value = self._get_text_from_params(extra_params)
-			if not text_value:
+		self._mark_cooldown(message.author.id)
+
+		invoked = self._get_invoked_name(message)
+		generator_name, extra_params = self._resolve_generator(invoked, params)
+
+		if not generator_name:
+			await self._safe_send(
+				message.channel,
+				content=f"Available: {', '.join(AVAILABLE_GENERATORS)}\n"
+				f"Example: `{settings.COMMAND_PREFIX}wanted @user`"
+			)
+			return
+
+		sadcat_text = None
+		if generator_name in {"sadcat", "achievement"}:
+			sadcat_text = self._get_sadcat_text(message, extra_params)
+			if not sadcat_text:
 				example = "Built a castle" if generator_name == "achievement" else "life is tough"
 				await self._safe_send(
 					message.channel,
 					content=f"`{generator_name}` needs text. Example: `{settings.COMMAND_PREFIX}{generator_name} {example}`"
 				)
 				return
-			if generator_name == "achievement" and len(text_value) > 60:
+			if generator_name == "achievement" and len(sadcat_text) > 60:
 				await self._safe_send(message.channel, content="Achievement text must be 60 characters or fewer.")
 				return
 			image = ""
@@ -106,9 +215,10 @@ class Generator(BaseCommand):
 				)
 				return
 
-		self._mark_cooldown(message.author.id)
-
 		secondary_image = self._get_secondary_image_for_ship(message, extra_params)
+		primary_name = self._resolve_display_name(message, extra_params, fallback_index=0)
+		secondary_name = self._resolve_display_name(message, extra_params, fallback_index=1)
+		caption = self._build_caption(generator_name, primary_name, secondary_name)
 		status_message = await self._safe_send(message.channel, content="Generating image...")
 		if not status_message:
 			# Rate limited, skip generation
@@ -117,7 +227,7 @@ class Generator(BaseCommand):
 			generator_name,
 			image,
 			secondary_image,
-			text_value=text_value,
+			sadcat_text=sadcat_text,
 		)
 		if not generated_buffer:
 			reason = error_message or "Failed to generate image. Please try again in a few moments."
@@ -125,52 +235,35 @@ class Generator(BaseCommand):
 			await status_message.edit(content=reason)
 			return
 
-		attachment_name = f"generated.{self._image_extension(generated_buffer)}"
+		attachment_name = "attachment.gif" if generator_name == "shake" else "attachment.png"
 		file = discord.File(fp=generated_buffer, filename=attachment_name)
-		await status_message.edit(content=None, attachments=[file])
+		if generator_name == "achievement":
+			await status_message.edit(content=None, attachments=[file])
+			return
 
-	def _build_help_embed(self):
 		embed = discord.Embed(
-			title="Image Generator",
-			description=f"`{settings.COMMAND_PREFIX}gen <effect> [@user | image URL | text]`",
-			color=discord.Color.from_rgb(52, 152, 219),
+			title=caption,
+			color=self._get_embed_color(generator_name),
 		)
-		embed.add_field(
-			name="Image effects",
-			value=", ".join(f"`{name}`" for name in AVAILABLE_GENERATORS if name not in TEXT_GENERATORS and name != "hue-rotate"),
-			inline=False,
-		)
-		embed.add_field(
-			name="Text effects",
-			value=", ".join(f"`{name}`" for name in sorted(TEXT_GENERATORS)),
-			inline=False,
-		)
-		embed.add_field(
-			name="Examples",
-			value=(
-				f"`{settings.COMMAND_PREFIX}gen wanted @user`\n"
-				f"`{settings.COMMAND_PREFIX}gen achievement Built a castle`\n"
-				f"`{settings.COMMAND_PREFIX}ship @user1 @user2`"
-			),
-			inline=False,
-		)
-		return embed
+		embed.set_image(url=f"attachment://{attachment_name}")
+		embed.set_footer(text=f"Requested by: {message.author.display_name}")
+		embed.add_field(name="Generator", value=generator_name, inline=True)
+		if generator_name == "ship":
+			ship_percentage = random.randint(1, 100)
+			ship_bar = self._build_percentage_bar(ship_percentage)
+			ship_emoji, ship_text = self._get_ship_result(ship_percentage)
+			embed.add_field(
+				name=f"Ship Worked {ship_emoji}",
+				value=f"{ship_bar} {ship_percentage}% - {ship_text}",
+				inline=False,
+			)
 
-	@staticmethod
-	def _image_extension(buffer):
-		position = buffer.tell()
 		try:
-			buffer.seek(0)
-			header = buffer.read(12)
-		finally:
-			buffer.seek(position)
-		if header.startswith((b"GIF87a", b"GIF89a")):
-			return "gif"
-		if header.startswith(b"\xff\xd8\xff"):
-			return "jpg"
-		if header.startswith(b"RIFF") and header[8:12] == b"WEBP":
-			return "webp"
-		return "png"
+			await status_message.delete()
+		except (discord.DiscordException, AttributeError):
+			pass
+
+		await self._safe_send(message.channel, embed=embed, file=file)
 
 	def _get_invoked_name(self, message):
 		content = message.content or ""
@@ -226,11 +319,56 @@ class Generator(BaseCommand):
 
 		return message.author.display_avatar.with_size(256).with_format("png").url
 
-	def _get_text_from_params(self, params):
+	def _resolve_display_name(self, message, params, fallback_index=0):
+		if len(message.mentions) > fallback_index:
+			return message.mentions[fallback_index].display_name
+
+		if len(params) > fallback_index:
+			candidate = params[fallback_index].strip()
+			if candidate.isdigit() and message.guild:
+				member = message.guild.get_member(int(candidate))
+				if member:
+					return member.display_name
+
+		return message.author.display_name
+
+	def _get_sadcat_text(self, message, params):
 		if params:
 			return " ".join(p.strip() for p in params if p.strip())
 
 		return None
+
+	def _build_caption(self, generator_name, first_name, second_name):
+		variants = self.GENERATOR_CAPTIONS.get(generator_name)
+		if variants:
+			template = random.choice(variants)
+			return template.format(first=first_name, second=second_name)
+
+		return f"Generated for {first_name}."
+
+	def _build_percentage_bar(self, percentage):
+		total_slots = 10
+		filled_slots = round((percentage / 100) * total_slots)
+		return "█" * filled_slots + "░" * (total_slots - filled_slots)
+
+	def _get_ship_result(self, percentage):
+		if percentage >= 50:
+			return "💖", "strong match"
+
+		if percentage < 10:
+			return "💔", "not a match"
+
+		return "💞", "it could go either way"
+
+	def _get_embed_color(self, generator_name):
+		palette = {
+			"ship": discord.Color.from_rgb(255, 105, 180),
+			"wanted": discord.Color.from_rgb(231, 76, 60),
+			"jail": discord.Color.from_rgb(155, 89, 182),
+			"blur": discord.Color.from_rgb(52, 152, 219),
+			"ad": discord.Color.from_rgb(241, 196, 15),
+		}
+		return palette.get(generator_name, discord.Color.from_rgb(52, 152, 219))
 
 	def _get_secondary_image_for_ship(self, message, params):
 		if len(message.mentions) >= 2:
@@ -254,7 +392,7 @@ class Generator(BaseCommand):
 		except ValueError:
 			return False
 
-	async def _generate(self, generator_name, image, secondary_image=None, text_value=None):
+	async def _generate(self, generator_name, image, secondary_image=None, sadcat_text=None):
 		"""Route local effects to the Pillow client and the rest to Popcat."""
 		if generator_name in LOCAL_EFFECTS:
 			return await self._generate_local(generator_name, image)
@@ -263,7 +401,7 @@ class Generator(BaseCommand):
 			generator_name,
 			image,
 			secondary_image,
-			text_value=text_value,
+			sadcat_text=sadcat_text,
 		)
 
 	async def _generate_local(self, effect_name: str, image_url: str):
@@ -285,7 +423,7 @@ class Generator(BaseCommand):
 		except Exception as exc:
 			return None, f"Local effect failed: {exc}"
 
-	async def _generate_with_popcat(self, generator_name, image, secondary_image=None, text_value=None):
+	async def _generate_with_popcat(self, generator_name, image, secondary_image=None, sadcat_text=None):
 		endpoint = POPCAT_AVATAR_GENERATORS.get(generator_name)
 		if not endpoint:
 			return None, f"`{generator_name}` is not mapped to a Popcat endpoint."
@@ -303,7 +441,7 @@ class Generator(BaseCommand):
 					endpoint,
 					image,
 					secondary_image_url=secondary_image,
-					text_value=text_value,
+					text_value=sadcat_text,
 				)
 				buffer = self._to_buffer(result)
 				if not buffer:
