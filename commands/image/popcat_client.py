@@ -15,9 +15,9 @@ class PopcatClient:
 		session = self.session or aiohttp.ClientSession()
 
 		try:
-			if endpoint == "sadcat":
+			if endpoint in {"sadcat", "achievement"}:
 				if not text_value:
-					raise RuntimeError("`sadcat` needs text. Example: `.sadcat life is tough`")
+					raise RuntimeError(f"`{endpoint}` needs text.")
 				return await self._fetch(session, endpoint, {"text": text_value})
 
 			if endpoint == "huerotate":
