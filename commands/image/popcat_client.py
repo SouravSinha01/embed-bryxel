@@ -23,6 +23,9 @@ class PopcatClient:
 			if endpoint == "huerotate":
 				return await self._fetch(session, endpoint, {"image": image_url, "deg": 120})
 
+			if endpoint == "jokeoverhead":
+				return await self._fetch(session, endpoint, {"image": image_url})
+
 			if endpoint == "ship":
 				if not secondary_image_url:
 					raise RuntimeError("`ship` needs two avatars. Mention another user.")
@@ -33,17 +36,19 @@ class PopcatClient:
 				}
 				return await self._fetch(session, endpoint, params)
 
+			parameter_errors = []
 			for param_name in ("image", "avatar"):
 				try:
 					return await self._fetch(session, endpoint, {param_name: image_url})
 				except RuntimeError as exc:
 					message = str(exc)
 					if "status 400" in message or "status 404" in message:
+						parameter_errors.append(f"{param_name}: {message}")
 						continue
 					raise
 
 			raise RuntimeError(
-				f"Popcat endpoint `{endpoint}` rejected the avatar/image parameter."
+				f"Popcat endpoint `{endpoint}` rejected the image: {'; '.join(parameter_errors)}"
 			)
 		finally:
 			if owns_session:
