@@ -225,10 +225,9 @@ class Generator(BaseCommand):
 			sadcat_text=sadcat_text,
 		)
 		if not generated_buffer:
-			await self._safe_send(
-				status_message,
-				content=error_message or "Failed to generate image. Please try again in a few moments."
-			)
+			reason = error_message or "Failed to generate image. Please try again in a few moments."
+			print(f"Image generation failed for {generator_name}: {reason}", flush=True)
+			await status_message.edit(content=reason)
 			return
 
 		attachment_name = "attachment.gif" if generator_name == "shake" else "attachment.png"

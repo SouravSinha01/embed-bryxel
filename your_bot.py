@@ -1,15 +1,14 @@
 import sys
 import asyncio
+import time
 
 import settings
 import discord
 import message_handler
-import keep_alive
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from events.base_event              import BaseEvent
 from events                         import *
-from multiprocessing                import Process
 
 # Set to remember if the bot is already running, since on_ready may be called
 # more than once on reconnects
@@ -65,17 +64,38 @@ async def _rotate_statuses(client):
     if not statuses:
         return
 
-    interval = max(10, settings.STATUS_ROTATION_INTERVAL_SECONDS)
-    idx = 0
-    print(f"Status rotation enabled ({len(statuses)} entries)", flush=True)
+    presence_statuses = {
+        "online": discord.Status.online,
+        "idle": discord.Status.idle,
+        "dnd": discord.Status.dnd,
+    }
+    activity_interval = max(10, settings.STATUS_ROTATION_INTERVAL_SECONDS)
+    presence_interval = settings.STATUS_PRESENCE_INTERVAL_HOURS * 3600
+    activity_idx = 0
+    presence_idx = 0
+    next_presence_change = time.monotonic() + presence_interval
+    print(
+        f"Status rotation enabled ({len(statuses)} activities, "
+        f"{len(settings.STATUS_PRESENCES)} presences, "
+        f"activity every {activity_interval}s, "
+        f"presence every {settings.STATUS_PRESENCE_INTERVAL_HOURS:g}h)",
+        flush=True,
+    )
 
     while True:
-        activity = _parse_status_entry(statuses[idx], client)
-        if activity is not None:
-            await client.change_presence(activity=activity)
+        now = time.monotonic()
+        while now >= next_presence_change:
+            presence_idx += 1
+            next_presence_change += presence_interval
 
-        idx = (idx + 1) % len(statuses)
-        await asyncio.sleep(interval)
+        activity = _parse_status_entry(statuses[activity_idx % len(statuses)], client)
+        presence = presence_statuses[
+            settings.STATUS_PRESENCES[presence_idx % len(settings.STATUS_PRESENCES)]
+        ]
+        await client.change_presence(activity=activity, status=presence)
+
+        activity_idx += 1
+        await asyncio.sleep(activity_interval)
 
 
 ###############################################################################
@@ -138,9 +158,6 @@ def main():
     @client.event
     async def on_message_edit(before, after):
         await common_handle_message(after)
-
-    # Start the keep alive server
-    keep_alive.keep_alive()
 
     # Finally, set the bot running
     client.run(settings.BOT_TOKEN)

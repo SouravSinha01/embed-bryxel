@@ -21,9 +21,9 @@ class Warps(BaseCommand):
 				"label": "current ark",
 				"usage": "/warp ark",
 				"summary": "Teleports you to the current ark.",
-				"details": "Current ARK - EverBlosson ark",
-				"image_url": "https://cdn.discordapp.com/attachments/889695047510011974/1495384407509569639/image.png?ex=69e60cc1&is=69e4bb41&hm=fb4eb614cfc328f55ffb858505f1ec62d3a9d1245409e9392a914d0854167444&",
-			},
+				"details": "Current ARK - Odyssey",
+				"image_url": "https://media.discordapp.net/attachments/1297182060649386045/1533824681784901783/content.png?ex=6b0635cd&is=6b04e44d&hm=2776b361fdf34ac1d6ea76ed1b753b662f88f9cde0f40c584b1aac14116ba368&format=webp&quality=lossless",
+				},
 			{
 				"key": "warp arkarchive",
 				"label": "arkarchive",

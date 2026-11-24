@@ -1,11 +1,20 @@
+import asyncio
+import math
+import time
+from datetime import datetime, timezone
+
+import aiohttp
 import discord
 from commands.base_command import BaseCommand
 
 
-USD_TO_PHP_RATE = 60.70
+USD_TO_PHP_RATE_URL = "https://api.exchangerate.fun/latest?base=USD"
+RATE_REFRESH_SECONDS = 60 * 60
+RATE_RETRY_SECONDS = 5 * 60
 GCASH_QR_IMAGE_URL = "https://cdn.discordapp.com/attachments/889695047510011974/1497415147302555803/image.png?ex=69ed7007&is=69ec1e87&hm=cc9d6d2c3349858cc1de8c569cc582dc8636d2b51c75a2f37bce329b5b49be21&"
 GCASH_RANKS_IMAGE_URL = "https://cdn.discordapp.com/attachments/889695047510011974/1497419716460023918/ChatGPT_Image_Apr_25_2026_07_40_58_AM.png?ex=69ed7449&is=69ec22c9&hm=88d9870919b5093235cc475b1b29ea3b7fe31183752f77c54fd65f9eb8841ae8&"
-GCASH_KEYS_IMAGE_URL = "https://media.discordapp.net/attachments/889695047510011974/1497420680906543257/content.png?ex=69ed752f&is=69ec23af&hm=9e7482f7299e27515aa93b258179a69f7123d607365bb1f2e0e32367b82dcdb5&=&format=webp&quality=lossless&width=1376&height=917"
+GCASH_SEASONAL_ARK_IMAGE_URL = "https://media.discordapp.net/attachments/987911480362016769/1574646651245559938/2c8aa7d4-7c5b-473a-8399-c0649493f96a.png?ex=6b066779&is=6b0515f9&hm=d4744c2d4f4509ae1c6a2441a2f1a46be0faf3cc41392641a0f6a81635ca39d2&format=webp&quality=lossless&width=1280&height=1049"
+GCASH_SPECIAL_ARK_IMAGE_URL = "https://cdn.discordapp.com/attachments/987911480362016769/1574649296593362984/66842f81-7688-460a-b4ad-422c1278d193.png?ex=6b0669ef&is=6b05186f&hm=2434887876835cadaecdf16978c28468cac3331d7860a20c39021873462f9fa5&"
 GCASH_RELICS_IMAGE_URL = "https://media.discordapp.net/attachments/889695047510011974/1497420882740772954/content.png?ex=69ed755f&is=69ec23df&hm=90ca5d411b6ecad243ef0bf4f4fdde5fa394aaf8a8c7c9fb2d77b79acabeec67&=&format=webp&quality=lossless&width=960&height=960"
 
 
@@ -18,21 +27,56 @@ class Gcash(BaseCommand):
 		category = "Utility"
 		super().__init__(description, params, aliases)
 		self.category = category
+		self._rate = None
+		self._rate_date = None
+		self._rate_stale = False
+		self._next_rate_fetch = 0
+		self._rate_lock = asyncio.Lock()
 
 	@staticmethod
-	def _usd_to_php(usd_amount):
-		return usd_amount * USD_TO_PHP_RATE
+	def _parse_rate(data):
+		if not isinstance(data, dict):
+			raise ValueError("Invalid exchange-rate response")
+		if data.get("base") != "USD":
+			raise ValueError("Unexpected exchange-rate currency pair")
+		rate = float(data["rates"]["PHP"])
+		if not math.isfinite(rate) or rate <= 0:
+			raise ValueError("Invalid USD/PHP exchange rate")
+		rate_date = datetime.fromtimestamp(int(data["timestamp"]), timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+		return rate, rate_date
 
-	@classmethod
-	def _format_line(cls, title, usd_amount, detail):
-		php_amount = cls._usd_to_php(usd_amount)
+	async def _get_rate(self):
+		async with self._rate_lock:
+			if time.monotonic() < self._next_rate_fetch:
+				return self._rate, self._rate_date, self._rate_stale
+
+			try:
+				timeout = aiohttp.ClientTimeout(total=8)
+				async with aiohttp.ClientSession(timeout=timeout) as session:
+					async with session.get(USD_TO_PHP_RATE_URL) as response:
+						response.raise_for_status()
+						data = await response.json()
+				self._rate, self._rate_date = self._parse_rate(data)
+				self._rate_stale = False
+				self._next_rate_fetch = time.monotonic() + RATE_REFRESH_SECONDS
+			except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, TypeError, ValueError) as exc:
+				print(f"Could not refresh USD/PHP rate: {exc}", flush=True)
+				self._rate_stale = True
+				self._next_rate_fetch = time.monotonic() + RATE_RETRY_SECONDS
+
+			return self._rate, self._rate_date, self._rate_stale
+
+	@staticmethod
+	def _format_line(title, usd_amount, detail, rate):
+		php_amount = usd_amount * rate
 		return (
 			f"**{title}**\n"
-			f"USD: `${usd_amount:g}` | PHP: `PHP {php_amount:,.2f}`\n"
+			f"USD: `${usd_amount:g}`\n"
+			f"PHP estimate: `PHP {php_amount:,.2f}`\n"
 			f"{detail}"
 		)
 
-	def _build_embed(self, title, description, body_lines, author, image_url=None):
+	def _build_embed(self, title, description, body_lines, author, image_url=None, columns=False):
 		embed = discord.Embed(
 			title=title,
 			description=description,
@@ -40,7 +84,14 @@ class Gcash(BaseCommand):
 		)
 
 		if body_lines:
-			embed.add_field(name="Pricing", value="\n\n".join(body_lines), inline=False)
+			if columns:
+				for index, line in enumerate(body_lines):
+					item_title, item_details = line.split("\n", 1)
+					embed.add_field(name=item_title.strip("*"), value=item_details, inline=True)
+					if index % 2 == 1 and index < len(body_lines) - 1:
+						embed.add_field(name="\u200b", value="\u200b", inline=True)
+			else:
+				embed.add_field(name="Payment steps", value="\n".join(body_lines), inline=False)
 
 		if image_url:
 			embed.set_image(url=image_url)
@@ -52,43 +103,53 @@ class Gcash(BaseCommand):
 		return embed
 
 	async def handle(self, params, message, client):
-		rate = USD_TO_PHP_RATE
+		rate, rate_date, rate_stale = await self._get_rate()
+		if rate is None:
+			await self._safe_send(
+				message.channel,
+				content="GCash pricing is temporarily unavailable because the USD/PHP rate could not be fetched. Please try again soon.",
+			)
+			return
 
 		patron_lines = [
-			self._format_line("Gilded Rank", 10, "Patron Rank"),
-			self._format_line("Radient Rank", 10, "Patron Rank"),
+			self._format_line("Gilded Rank", 10, "Patron Rank", rate),
+			self._format_line("Radient Rank", 10, "Patron Rank", rate),
 		]
 
 		key_pricing = [
-			(2, 7),
-			(4, 15),
+			(2, 8),
+			(4, 16),
 			(6, 32),
 			(8, 64),
 		]
 
-		realm_key_lines = [
-			self._format_line(f"${usd:g} Package", usd, f"{amount} Realm Keys")
+		special_ark_key_lines = [
+			self._format_line(f"$**{usd:g}** Package", usd, f"**{amount}** Special ARK Keys", rate)
 			for usd, amount in key_pricing
 		]
 
-		everblosson_key_lines = [
-			self._format_line(f"${usd:g} Package", usd, f"{amount} Everblosson Keys")
+		seasonal_ark_key_lines = [
+			self._format_line(f"$**{usd:g}** Package", usd, f"**{amount}** Seasonal ARK Keys", rate)
 			for usd, amount in key_pricing
 		]
 
 		relic_lines = [
-			self._format_line("Starter Relics", 0.5, "50 Relics"),
-			self._format_line("Basic Relics", 1, "100 Relics"),
-			self._format_line("Hunter Relics", 5, "500 Relics"),
-			self._format_line("Collector Relics", 10, "1000 Relics"),
+			self._format_line("Starter Relics", 0.5, "**50 Relics**", rate),
+			self._format_line("Basic Relics", 1, "**100 Relics**", rate),
+			self._format_line("Hunter Relics", 5, "**500 Relics**", rate),
+			self._format_line("Collector Relics", 10, "**1000 Relics**", rate),
 		]
+		rate_note = f"**USD/PHP market rate:** $1 = PHP {rate:,.4f} (ExchangeRate.fun, {rate_date})\n"
+		if rate_stale:
+			rate_note += "**Last available rate; confirm the PHP amount before paying.**\n"
 
 		pages = {
 			"overview": self._build_embed(
 				title="GCash Store Pricing | Bryxel Realm",
 				description=(
 					"**IMPORTANT:** After paying, open a ticket and attach a screenshot of your payment.\n\n"
-					f"**Conversion used:** $1 = PHP {rate:,.2f}\n"
+					f"{rate_note}\n\n"
+					"**PHP amounts are estimates; market and payment rates may differ wrt Global Prices, Check Once!**.\n\n"
 					"Use the dropdown menu below to view pricing per category."
 				),
 				body_lines=[
@@ -105,20 +166,23 @@ class Gcash(BaseCommand):
 				body_lines=patron_lines,
 				author=message.author,
 				image_url=GCASH_RANKS_IMAGE_URL,
+				columns=True,
 			),
-			"realm_keys": self._build_embed(
-				title="Realm Keys",
-				description="Realm Key packages and converted PHP values.",
-				body_lines=realm_key_lines,
+			"special_ark_keys": self._build_embed(
+				title="Special ARK Keys",
+				description="Special ARK key packages and converted PHP values.",
+				body_lines=special_ark_key_lines,
 				author=message.author,
-				image_url=GCASH_KEYS_IMAGE_URL,
+				image_url=GCASH_SPECIAL_ARK_IMAGE_URL,
+				columns=True,
 			),
-			"everblosson_keys": self._build_embed(
-				title="Everblosson Keys (Seasonal)",
-				description="Seasonal key packages (same pricing as Realm Keys).",
-				body_lines=everblosson_key_lines,
+			"seasonal_ark_keys": self._build_embed(
+				title="Seasonal ARK Keys",
+				description="Seasonal ARK key packages and converted PHP values.",
+				body_lines=seasonal_ark_key_lines,
 				author=message.author,
-				image_url=GCASH_KEYS_IMAGE_URL,
+				image_url=GCASH_SEASONAL_ARK_IMAGE_URL,
+				columns=True,
 			),
 			"relics": self._build_embed(
 				title="Bryxel Relic Packages",
@@ -126,6 +190,7 @@ class Gcash(BaseCommand):
 				body_lines=relic_lines,
 				author=message.author,
 				image_url=GCASH_RELICS_IMAGE_URL,
+				columns=True,
 			),
 		}
 
@@ -134,8 +199,8 @@ class Gcash(BaseCommand):
 				options = [
 					discord.SelectOption(label="Overview", value="overview", description="Payment steps and important info", emoji="📌"),
 					discord.SelectOption(label="Patron Ranks", value="ranks", description="Gilded and Radient pricing", emoji="👑"),
-					discord.SelectOption(label="Realm Keys", value="realm_keys", description="7, 15, 32, 64 key packages", emoji="🗝️"),
-					discord.SelectOption(label="Everblosson Keys", value="everblosson_keys", description="Seasonal key pricing", emoji="🌸"),
+					discord.SelectOption(label="Special ARK Keys", value="special_ark_keys", description="Special ARK key pricing", emoji="🗝️"),
+					discord.SelectOption(label="Seasonal ARK Keys", value="seasonal_ark_keys", description="Seasonal ARK key pricing", emoji="🌸"),
 					discord.SelectOption(label="Relic Packages", value="relics", description="50 to 1000 relic bundles", emoji="🧿"),
 				]
 				super().__init__(
