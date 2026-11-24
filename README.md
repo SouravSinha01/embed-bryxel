@@ -101,7 +101,7 @@ PORT=8080
 POPCAT_BASE_URL=https://api.popcat.xyz
 ```
 
-Run `.gen` to see the available effects and examples. A generated image replaces the progress message with an embed and an attachment in the format returned by the effect.
+Run `.gen` to see the available effects and examples. A generated image replaces the progress message as a plain attachment in the format returned by the effect.
 
 Popcat-backed effects:
 
