@@ -5,6 +5,7 @@ import time
 import settings
 import discord
 import message_handler
+import keep_alive
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from events.base_event              import BaseEvent
@@ -158,6 +159,8 @@ def main():
     @client.event
     async def on_message_edit(before, after):
         await common_handle_message(after)
+
+    keep_alive.keep_alive()
 
     # Finally, set the bot running
     client.run(settings.BOT_TOKEN)

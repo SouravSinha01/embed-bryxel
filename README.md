@@ -1,7 +1,7 @@
 # Bryxel Assistant (Discord Bot)
 
 Bryxel Assistant is a modular Discord bot for the BryxelRealm community.
-It includes categorized commands, rich embeds, and interactive views/buttons.
+It includes categorized commands, rich embeds, interactive views/buttons, a keep-alive web endpoint, and an optional auto-restart script for development.
 
 ## Features
 
@@ -10,12 +10,16 @@ It includes categorized commands, rich embeds, and interactive views/buttons.
 - Interactive help center with dropdown navigation.
 - Utility commands for voting, donation/store links, server IP info, tickets, polls, and avatars.
 - Ingame command guide embeds with dropdown-based navigation.
+- Keep-alive Flask server with `/` and `/ping` endpoints.
+- Optional watchdog-based auto-restart while editing Python files.
 
 ## Project Structure
 
-- `your_bot.py`: Main bot startup, Discord client events, and scheduler bootstrap.
+- `your_bot.py`: Main bot startup, Discord client events, scheduler bootstrap, and keep-alive startup.
 - `message_handler.py`: Registers command handlers from subclasses of `BaseCommand` and dispatches commands.
 - `settings.py`: Environment-based runtime configuration.
+- `keep_alive.py`: Flask app used for health checks.
+- `auto_restart.py`: Development helper that restarts the bot when Python files change.
 - `commands/`: Command modules grouped into subpackages.
 - `events/`: Event base system (currently no custom scheduled events are defined).
 
@@ -66,6 +70,7 @@ Create a `.env` file (or set env vars directly):
 - `STATUS_PRESENCES` (optional, default: `online`): Rotating presence indicators, separated by `||`. Use `online`, `idle`, and/or `dnd`.
 - `STATUS_ROTATION_INTERVAL_SECONDS` (optional, default: `45`): Seconds between activity text changes (minimum 10).
 - `STATUS_PRESENCE_INTERVAL_HOURS` (optional, default: `4`): Hours between online, idle, and DND changes.
+- `PORT` (optional, default: `8080`): Port used by the Flask keep-alive service.
 - `POPCAT_BASE_URL` (optional, default: `https://api.popcat.xyz`): Base URL for Popcat API.
 
 Supported status types:
@@ -92,6 +97,7 @@ STATUS_MESSAGES=playing:{prefix}help||playing:helping {server_members} members||
 STATUS_PRESENCES=online||idle||dnd
 STATUS_ROTATION_INTERVAL_SECONDS=45
 STATUS_PRESENCE_INTERVAL_HOURS=4
+PORT=8080
 POPCAT_BASE_URL=https://api.popcat.xyz
 ```
 
@@ -134,6 +140,14 @@ pm2 save
 ```
 
 To restore saved PM2 processes after a machine reboot, run `pm2 startup` as your normal user, then run the `sudo` command it prints. PM2 manages the bot process; `pm2 logs bryxel-bot` shows its output.
+
+### Keep-alive endpoint
+
+The bot serves `GET /` and `GET /ping` on port `8080` by default. Check it locally at `http://127.0.0.1:8080/ping`.
+
+### Development auto-restart
+
+If the bot is not running under PM2, use `.venv/bin/python auto_restart.py` to restart it when Python files change. Do not run both launch methods at once, or you will start two bot processes.
 
 ## Notes
 
